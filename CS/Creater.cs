@@ -32,7 +32,7 @@ namespace TPRS
 		}
 
 		//識別共通木の作成
-		public D_List<O> Study(O other,double rho)
+		public D_List<O> Study(O other,double rho,bool opt = false)
 		{
 			//共通木の作成
 			D_List<O> list = new D_List<O>(other);
@@ -93,18 +93,21 @@ namespace TPRS
 				if(wpb)
 				{
 					//ここから最適化
-					bool erflg = true;
-					for(int j = 0;j < buf_case.Count;j++)
+					if(opt)
 					{
-						if(!buf_pm[j])
+						bool erflg = true;
+						for(int j = 0;j < buf_case.Count;j++)
 						{
-							erflg = erflg && !d.Match(buf_case[j]);
+							if(!buf_pm[j])
+							{
+								erflg = erflg && !d.Match(buf_case[j]);
+							}
 						}
-					}
 
-					if(erflg)
-					{
-						list.RemoveEnd();
+						if(erflg)
+						{
+							list.RemoveEnd();
+						}
 					}
 					//ここまで最適化
 
@@ -123,18 +126,21 @@ namespace TPRS
 						d.W[j] *= -1.0;
 
 					//ここから最適化
-					bool erflg = true;
-					for(int j = 0;j < buf_case.Count;j++)
+					if(opt)
 					{
-						if(buf_pm[j])
+						bool erflg = true;
+						for(int j = 0;j < buf_case.Count;j++)
 						{
-							erflg = erflg && !d.Match(buf_case[j]);
+							if(buf_pm[j])
+							{
+								erflg = erflg && !d.Match(buf_case[j]);
+							}
 						}
-					}
 
-					if(erflg)
-					{
-						list.RemoveEnd();
+						if(erflg)
+						{
+							list.RemoveEnd();
+						}
 					}
 					//ここまで最適化
 
