@@ -32,9 +32,11 @@ namespace base
 				void remove_end();
 				void remove_begin();
 				O run(std::vector<double> input);
+				long run_cost(std::vector<double> input);
+				void run_history(std::vector<double> input,void(*progress)(discriminator,int,O));
+				void run_history(std::vector<double> input,std::vector<discriminator>&,std::vector<O>&);
 				size_t size();
-				void get_data(std::vector<discriminator>&,
-						std::vector<O>&);
+				void get_data(std::vector<discriminator>&,std::vector<O>&);
 				d_list<O> operator=(const d_list<O>&);
 			protected:
 				struct node
@@ -97,11 +99,11 @@ namespace base
 //			while(n != nullptr)
 //			{
 //				node* nn = n->next;
-//				//delete n;
+//				delete n;
 //				n = nn;
 //			}
-//			std::cout << std::endl;
 		}
+
 	template<typename O>
 		void d_list<O>::add_node(O output,discriminator d)
 		{
@@ -115,6 +117,7 @@ namespace base
 				begin = n;
 			sizel++;
 		}
+
 	template<typename O>
 		void d_list<O>::remove_end()
 		{
@@ -129,6 +132,7 @@ namespace base
 				sizel--;
 			}
 		}
+
 	template<typename O>
 		void d_list<O>::remove_begin()
 		{
@@ -144,6 +148,7 @@ namespace base
 	template<typename O>
 		size_t d_list<O>::size()
 		{ return sizel; }
+
 	template<typename O>
 		d_list<O> d_list<O>::operator=(const d_list<O>& list)
 		{
@@ -184,6 +189,80 @@ namespace base
 				}
 			}
 		}
+
+	template<typename O>
+		void d_list<O>::run_history(std::vector<double> input,void(*progress)(discriminator,int,O))
+		{
+			node* n = begin;
+			int i = 0;
+			while(true)
+			{
+				if(n == nullptr)
+				{
+					return other;
+				}
+				else if(!n->d.match(input))
+				{
+					progress(n->d,i,n->output);
+					i++;
+					n = n->next;
+				}
+				else if(n->d.match(input))
+				{
+					progress(n->d,i,n->output);
+					return;
+				}
+			}
+		}
+
+	template<typename O>
+		void d_list<O>::run_history(std::vector<double> input,std::vector<discriminator >& ow,std::vector<O>& oo)
+		{
+			node* n = begin;
+			while(true)
+			{
+				if(n == nullptr)
+				{
+					return other;
+				}
+				else if(!n->d.match(input))
+				{
+					ow.push_back(n->d);
+					oo.push_back(n->output);
+					n = n->next;
+				}
+				else if(n->d.match(input))
+				{
+					ow.push_back(n->d);
+					oo.push_back(n->output);
+					return;
+				}
+			}
+		}
+
+	template<typename O>
+		long d_list<O>::run_cost(std::vector<double> input)
+		{
+			node* n = begin;
+			long cost = 1;
+			while(true)
+			{
+				if(n == nullptr)
+				{
+					return -1;
+				}
+				else if(!n->d.match(input))
+				{
+					n = n->next;
+					cost++;
+				}
+				else if(n->d.match(input))
+				{
+					return cost;
+				}
+			}
+		}
+
 	template<typename O>
 		void d_list<O>::get_data(std::vector<discriminator>& ds
 				,std::vector<O>& os)
@@ -228,6 +307,7 @@ namespace base
 		{
 			return cases.size();
 		}
+
 	namespace
 	{
 		template<typename T>
@@ -259,6 +339,7 @@ namespace base
 			std::vector< std::vector<double> > ref_case = cases,
 				buf_case = cases;
 			std::vector<bool> ref_pm = pm,buf_pm = pm;
+			bool bwpb = false,bwmb = false;
 			do
 			{
 				discriminator d(ref_case[0].size());
@@ -313,7 +394,7 @@ namespace base
 				{
 					//ここから最適化
 					//*
-					if(opt)
+					if(opt && bwpb)
 					{
 						bool erflg = true;
 						size_t bcs = buf_case.size();
@@ -346,8 +427,17 @@ namespace base
 						{
 							list.remove_end();
 						}
+						else
+						{
+							buf_case = ref_case;
+							buf_pm = ref_pm;
+						}
 					}
-					//*/
+					else if(opt)
+					{
+						bwmb = false;
+						bwpb = true;
+					}
 					//ここまで最適化
 
 					list.add_node(wp,d);
@@ -365,7 +455,7 @@ namespace base
 						d.W(j) *= -1.0;
 
 					//ここから最適化
-					if(opt)
+					if(opt && bwmb)
 					{
 						size_t bcs = buf_case.size();
 						size_t rcs = ref_case.size();
@@ -399,6 +489,16 @@ namespace base
 						{
 							list.remove_end();
 						}
+						else
+						{
+							buf_case = ref_case;
+							buf_pm = ref_pm;
+						}
+					}
+					else if(opt)
+					{
+						bwmb = true;
+						bwpb = false;
 					}
 					//ここまで最適化
 
@@ -411,8 +511,6 @@ namespace base
 						}
 					}
 				}
-				buf_case = ref_case;
-				buf_pm = ref_pm;
 				ref_case = outof(ref_case,outt);
 				ref_pm = outof(ref_pm,outt);
 
