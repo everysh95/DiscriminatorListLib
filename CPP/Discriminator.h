@@ -27,27 +27,18 @@ namespace base
 			public:
 				d_list();
 				d_list(O other);
-				d_list(const d_list<O>&);
 				virtual ~d_list();
 				void add_node(O output,discriminator d);
 				void remove_end();
-				void remove_begin();
 				O run(std::vector<double> input);
 				long run_cost(std::vector<double> input);
 				void run_history(std::vector<double> input,void(*progress)(discriminator,int,O));
 				void run_history(std::vector<double> input,std::vector<discriminator>&,std::vector<O>&);
 				size_t size();
 				void get_data(std::vector<discriminator>&,std::vector<O>&);
-				d_list<O> operator=(const d_list<O>&);
 			protected:
-				struct node
-				{
-					node* next;
-					discriminator d;
-					O output;
-				};
-				node* begin;
-				node* end;
+				std::vector<discriminator> d;
+				std::vector<O> output;
 				O other;
 				size_t sizel;
 		};
@@ -77,119 +68,55 @@ namespace base
 	//--d_list--
 	template<typename O>
 		d_list<O>::d_list()
-		:begin(nullptr),end(nullptr),sizel(0)
 		{}
 
 	template<typename O>
 		d_list<O>::d_list(O other)
-		:other(other),begin(nullptr),end(nullptr),sizel(0)
+		:other(other),sizel(0)
 		{}
 
 	template<typename O>
-		d_list<O>::d_list(const d_list<O>& list)
-		:other(list.other),begin(nullptr),end(nullptr),sizel(list.sizel)
-		{
-			node* ln = list.begin;
-			while(ln != nullptr)
-			{
-				add_node(ln->output,ln->d);
-			}
-		}
-
-	template<typename O>
 		d_list<O>::~d_list()
-		{
-//			node *n = begin;
-//			while(n != nullptr)
-//			{
-//				node* nn = n->next;
-//				delete n;
-//				n = nn;
-//			}
-		}
+		{}
 
 	template<typename O>
 		void d_list<O>::add_node(O output,discriminator d)
 		{
-			node* n = new node();
-			n->output = output;
-			n->d = d;
-			if(end != nullptr)
-				end->next = n;
-			end = n;
-			if(begin == nullptr)
-				begin = n;
+			this->d.push_back(d);
+			this->output.push_back(output);
 			sizel++;
 		}
 
 	template<typename O>
 		void d_list<O>::remove_end()
 		{
-			node* n = begin;
-			if(end != nullptr && n != end)
-			{
-				while(n->next != end)
-					n = n->next;
-				n->next = nullptr;
-				delete end;
-				end = n;
-				sizel--;
-			}
-		}
-
-	template<typename O>
-		void d_list<O>::remove_begin()
-		{
-			if(begin != nullptr)
-			{
-				node* bn = begin->next;
-				delete begin;
-				begin = bn;
-				sizel--;
-			}
+			d.pop_back();
+			output.pop_back();
+			sizel--;
 		}
 
 	template<typename O>
 		size_t d_list<O>::size()
 		{ return sizel; }
 
-	template<typename O>
-		d_list<O> d_list<O>::operator=(const d_list<O>& list)
-		{
-			node *n = begin;
-			while(n != nullptr)
-			{
-				node* nn = n->next;
-				delete n;
-				n = nn;
-			}
-			begin = nullptr;
-			end = nullptr;
-			node* ln = list.begin;
-			while(ln != nullptr)
-			{
-				add_node(ln->output,ln->d);
-				ln = ln->next;
-			}
-		}
 
 	template<typename O>
 		O d_list<O>::run(std::vector<double> input)
 		{
-			node* n = begin;
+			size_t i = 0;
 			while(true)
 			{
-				if(n == nullptr)
+				if(i >= sizel)
 				{
 					return other;
 				}
-				else if(!n->d.match(input))
+				else if(!d[i].match(input))
 				{
-					n = n->next;
+					i++;
 				}
-				else if(n->d.match(input))
+				else if(d[i].match(input))
 				{
-					return n->output;
+					return output[i];
 				}
 			}
 		}
@@ -197,23 +124,21 @@ namespace base
 	template<typename O>
 		void d_list<O>::run_history(std::vector<double> input,void(*progress)(discriminator,int,O))
 		{
-			node* n = begin;
-			int i = 0;
+			size_t i = 0;
 			while(true)
 			{
-				if(n == nullptr)
+				if(i >= sizel)
 				{
-					return other;
+					return;
 				}
-				else if(!n->d.match(input))
+				else if(!d[i].match(input))
 				{
-					progress(n->d,i,n->output);
+					progress(d[i],i,output[i]);
 					i++;
-					n = n->next;
 				}
-				else if(n->d.match(input))
+				else if(d[i].match(input))
 				{
-					progress(n->d,i,n->output);
+					progress(d[i],i,output[i]);
 					return;
 				}
 			}
@@ -222,23 +147,23 @@ namespace base
 	template<typename O>
 		void d_list<O>::run_history(std::vector<double> input,std::vector<discriminator >& ow,std::vector<O>& oo)
 		{
-			node* n = begin;
+			size_t i = 0;
 			while(true)
 			{
-				if(n == nullptr)
+				if(i >= sizel)
 				{
-					return other;
+					return;
 				}
-				else if(!n->d.match(input))
+				else if(!d[i].match(input))
 				{
-					ow.push_back(n->d);
-					oo.push_back(n->output);
-					n = n->next;
+					ow.push_back(d[i]);
+					oo.push_back(output[i]);
+					i++;
 				}
-				else if(n->d.match(input))
+				else if(d[i].match(input))
 				{
-					ow.push_back(n->d);
-					oo.push_back(n->output);
+					ow.push_back(d[i]);
+					oo.push_back(output[i]);
 					return;
 				}
 			}
@@ -247,22 +172,20 @@ namespace base
 	template<typename O>
 		long d_list<O>::run_cost(std::vector<double> input)
 		{
-			node* n = begin;
-			long cost = 1;
+			size_t i = 0;
 			while(true)
 			{
-				if(n == nullptr)
+				if(i >= sizel)
 				{
 					return -1;
 				}
-				else if(!n->d.match(input))
+				else if(!d[i].match(input))
 				{
-					n = n->next;
-					cost++;
+					i++;
 				}
-				else if(n->d.match(input))
+				else if(d[i].match(input))
 				{
-					return cost;
+					return static_cast<long>(i);
 				}
 			}
 		}
@@ -271,18 +194,9 @@ namespace base
 		void d_list<O>::get_data(std::vector<discriminator>& ds
 				,std::vector<O>& os)
 		{
-			std::vector<discriminator> dans(sizel);
-			std::vector<O> oans(sizel + 1);
-			node* n = begin;
-			for(int i = 0;i < sizel;i++)
-			{
-				dans[i] = n->d;
-				oans[i] = n->output;
-				n = n->next;
-			}
-			oans[sizel] = other;
-			ds = dans;
-			os = oans;
+			ds = d;
+			os = output;
+			os.push_back(other);
 		}
 
 	//--d_creater--
@@ -464,10 +378,8 @@ namespace base
 			std::vector<unsigned long> ref_class = classes;
 			std::vector<std::vector<double> > buf_case;
 			std::vector<unsigned long> buf_class;
-			progress(0,ref_case.size(),cases.size());
 
 			{
-				progress(0,ref_case.size(),cases.size());
 				std::vector<int> outt;
 				for(int i = 0;i < ref_case.size();i++)
 				{
@@ -481,12 +393,12 @@ namespace base
 				ref_case = outof(ref_case,outt);
 				ref_class = outof(ref_class,outt);
 				ans.add_node(oo[0],od[0]);
+				progress(0,ref_case.size(),cases.size());
 			}
 
 			int sc = 0;
-			for(int c = 1;c = od.size();c++)
+			for(int c = 1;c < od.size();c++)
 			{
-				progress(0,ref_case.size(),cases.size());
 				if(oo[c - 1] == oo[c])
 				{
 					bool erflg = true;
@@ -515,9 +427,26 @@ namespace base
 					{
 						ans.remove_end();
 					}
+					else
+					{
+						buf_class = ref_class;
+						buf_case = ref_case;
+					}
+				}
+				std::vector<int> outt;
+				int ri = -1;
+				for(int i = 0;i < ref_case.size();i++)
+				{
+					if(od[c].match(ref_case[i]))
+					{
+						outt.push_back(i);
+						ri = ref_class[i];
+					}
 				}
 				ans.add_node(oo[c],od[c]);
-
+				ref_case = outof(ref_case,outt);
+				ref_class = outof(ref_class,outt);
+				progress(ri,ref_case.size(),cases.size());
 			}
 			return ans;
 		}
