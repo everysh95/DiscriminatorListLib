@@ -3,7 +3,6 @@
 
 #include<cstdlib>
 #include<vector>
-#include<iostream>
 
 namespace base
 {
@@ -56,17 +55,17 @@ namespace base
 		class d_creater
 		{
 			public:
-				d_creater(std::vector<O> outputs);
+				d_creater(O wp,O wm);
 				void add_case(std::vector<double> t,O c);
 				d_list<O> study(O ohter,double rho,
-						void(*progress)(long,int,int) = 
-						[](long ri,int i,int s){return;});
+						bool opt = false,
+						void(*progress)(bool,bool,int,int) = 
+						[](bool t,bool f,int i,int s){return;});
 				size_t case_size();
-				size_t class_size();
 			private:
 				std::vector<std::vector<double> > cases;
-				std::vector<unsigned long> classes;
-				std::vector<O> outputs;
+				std::vector<bool> pm;
+				O wm,wp;
 		};
 
 	//ここからテンプレート関数の定義
@@ -284,33 +283,29 @@ namespace base
 	//--d_creater--
 	
 	template<typename O>
-		d_creater<O>::d_creater(std::vector<O> outputs)
-		:outputs(outputs)
+		d_creater<O>::d_creater(O wp,O wm)
+		:wp(wp),wm(wm)
 		{}
 
 	template<typename O>
 		void d_creater<O>::add_case(std::vector<double> t,O c)
 		{
-			for(int i = 0;i < outputs.size();i++)
+			if(c == wp)
 			{
-				if(outputs[i] == c)
-				{
-					classes.push_back(i);
-					break;
-				}
+				pm.push_back(true);
+				cases.push_back(t);
 			}
-			cases.push_back(t);
+			if(c == wm)
+			{
+				pm.push_back(false);
+				cases.push_back(t);
+			}
 		}
 
 	template<typename O>
 		size_t d_creater<O>::case_size()
 		{
 			return cases.size();
-		}
-	template<typename O>
-		size_t d_creater<O>::class_size()
-		{
-			return outputs.size();
 		}
 
 	namespace
@@ -335,118 +330,192 @@ namespace base
 				}
 				return ans;
 			}
-
-		long find_t(std::vector<bool> tar)
-		{
-			for(long i = 0;i < tar.size();i++)
-			{
-				if(tar[i])
-					return i;
-			}
-			return -1;
-		}
-
-		long find_f(std::vector<bool> tar)
-		{
-			for(long i = 0;i < tar.size();i++)
-			{
-				if(!tar[i])
-					return i;
-			}
-			return -1;
-		}
 	}
 
 	template<typename O>
-		d_list<O> d_creater<O>::study(O other,double rho,void(*progress)(long,int,int))
+		d_list<O> d_creater<O>::study(O other,double rho,bool opt,void(*progress)(bool,bool,int,int))
 		{
 			d_list<O> list(other);
-			std::vector< std::vector<double> > ref_case = cases;
-			std::vector<unsigned long> ref_class = classes;
-			std::vector<discriminator> d(class_size());
-
-			for(int i = 0;i < class_size();i++)
-			{
-				d[i] = discriminator(cases[0].size());
-				d[i].W(0) = 1;
-			}
-			std::vector<bool> wb(class_size(),false);
+			std::vector< std::vector<double> > ref_case = cases,
+				buf_case = cases;
+			std::vector<bool> ref_pm = pm,buf_pm = pm;
+			bool bwpb = false,bwmb = false;
 			do
 			{
+				discriminator d(ref_case[0].size());
+				d.W(0) = 1;
+				bool wpb = false,wmb = false;
 				do
 				{
-					do
+					for(int i = 0;i < ref_case.size() && !wpb && !wmb;i++)
 					{
-						for(int i = 0;i < ref_case.size();i++)
+						if(d.match(ref_case[i]) && !ref_pm[i])
 						{
-							int c = classes[i];
-							for(int j = 0;j < d[c].W_size();j++)
-								d[c].W(j) += rho * ref_case[i][j];
+							for(int j = 0;j < ref_case[i].size();j++)
+								d.W(j) -= rho*ref_case[i][j];
 						}
-						wb = std::vector<bool>(class_size(),false);
-						for(int i = 0;i < ref_case.size();i++)
+						if(!d.match(ref_case[i]) && ref_pm[i])
 						{
-							int c = classes[i];
-							wb[c] = wb[c] || d[c].match(ref_case[i]);
+							for(int j = 0;j < ref_case[i].size();j++)
+								d.W(j) += rho*ref_case[i][j];
 						}
-					}
-					while(find_t(wb) == -1);
 
-					do
-					{
-						for(int i = 0;i < ref_case.size();i++)
+						wpb = false;
+						wmb = false;
+						for(int j = 0;j < ref_case.size();j++)
 						{
-							int c = classes[i];
-							for(int k = 0;k < class_size();k++)
+							if(ref_pm[j])
 							{
-								if(c != k && d[k].match(ref_case[i]))
-								{
-									for(int j = 0;j < d[c].W_size();j++)
-										d[k].W(j) -= rho * ref_case[i][j];
-								}
+								wpb = wpb || d.match(ref_case[j]);
+							}
+							else
+							{
+								wmb = wmb || !d.match(ref_case[j]);
 							}
 						}
-						wb = std::vector<bool>(class_size(),false);
-						for(int i = 0;i < ref_case.size();i++)
+						for(int j = 0;j < ref_case.size();j++)
 						{
-							int c = classes[i];
-							wb[c] = wb[c] || d[c].match(ref_case[i]);
-						}
-						if(find_t(wb) == -1)
-						{
-							break;
-						}
-						for(int i = 0;i < ref_case.size();i++)
-						{
-							for(int k = 0;k < class_size();k++)
+							if(ref_pm[j])
 							{
-								int c = classes[i];
-								if(c != k)
-								{
-									wb[k] = wb[k] && !d[k].match(ref_case[i]);
-								}
+								wmb = wmb && d.match(ref_case[j]);
+							}
+							else
+							{
+								wpb = wpb && !d.match(ref_case[j]);
 							}
 						}
 					}
-					while(find_t(wb) == -1);
+
 				}
-				while(find_t(wb) == -1);
+				while(!wpb && !wmb);
 
 				std::vector<int> outt;
-
-				long rindex = find_t(wb);
-				list.add_node(outputs[rindex],d[rindex]);
-				for(int i = 0;i < ref_case.size();i++)
+				if(wpb)
 				{
-					if(d[rindex].match(ref_case[i]) && rindex == classes[i])
+					//ここから最適化
+					//*
+					if(opt && bwpb)
 					{
-						outt.push_back(i);
+						bool erflg = true;
+						size_t bcs = buf_case.size();
+						size_t rcs = ref_case.size();
+						for(int j = 0;j < bcs;j++)
+						{
+							if(!buf_pm[j])
+							{
+								erflg = erflg && !d.match(buf_case[j]);
+							}
+							else
+							{
+								bool eaflg = false;
+								for(int i = 0;i < rcs;i++)
+								{
+									if(buf_case[j] == ref_case[i])
+									{
+										eaflg = true;
+										break;
+									}
+								}
+								if(!eaflg)
+								{
+									erflg = erflg && d.match(buf_case[j]);
+								}
+							}
+						}
+
+						if(erflg)
+						{
+							list.remove_end();
+						}
+						else
+						{
+							buf_case = ref_case;
+							buf_pm = ref_pm;
+						}
+					}
+					else if(opt)
+					{
+						bwmb = false;
+						bwpb = true;
+					}
+					//*/
+					//ここまで最適化
+
+					list.add_node(wp,d);
+					for(int i = 0;i < ref_case.size();i++)
+					{
+						if(d.match(ref_case[i]) && ref_pm[i])
+						{
+							outt.push_back(i);
+						}
 					}
 				}
-				progress(rindex,ref_case.size(),outt.size());
-				ref_case = outof(ref_case,outt);
-				ref_class = outof(ref_class,outt);
+				else if(wmb)
+				{
+					for(int j = 0;j < d.W_size();j++)
+						d.W(j) *= -1.0;
 
+					//ここから最適化
+					if(opt && bwmb)
+					{
+						size_t bcs = buf_case.size();
+						size_t rcs = ref_case.size();
+						bool erflg = true;
+
+						for(int j = 0;j < bcs;j++)
+						{
+							if(buf_pm[j])
+							{
+								erflg = erflg && !d.match(buf_case[j]);
+							}
+							else
+							{
+								bool eaflg = false;
+								for(int i = 0;i < rcs;i++)
+								{
+									if(buf_case[j] == ref_case[i])
+									{
+										eaflg = true;
+										break;
+									}
+								}
+								if(!eaflg)
+								{
+									erflg = erflg && d.match(buf_case[j]);
+								}
+							}
+						}
+
+						if(erflg)
+						{
+							list.remove_end();
+						}
+						else
+						{
+							buf_case = ref_case;
+							buf_pm = ref_pm;
+						}
+					}
+					else if(opt)
+					{
+						bwmb = true;
+						bwpb = false;
+					}
+					//ここまで最適化
+
+					list.add_node(wm,d);
+					for(int i = 0;i < ref_case.size();i++)
+					{
+						if(d.match(ref_case[i]) && !ref_pm[i])
+						{
+							outt.push_back(i);
+						}
+					}
+				}
+				ref_case = outof(ref_case,outt);
+				ref_pm = outof(ref_pm,outt);
+
+				progress(wpb,wmb,ref_case.size(),cases.size());
 			}
 			while(ref_case.size() > 0);
 
