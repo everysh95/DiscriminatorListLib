@@ -61,6 +61,9 @@ namespace base
 				d_list<O> study(O ohter,double rho,
 						void(*progress)(long,int,int) = 
 						[](long ri,int i,int s){return;});
+				d_list<O> optimisation(d_list<O> target,
+						void(*progress)(long,int,int) = 
+						[](long ri,int i,int s){return;});
 				size_t case_size();
 				size_t class_size();
 			private:
@@ -269,7 +272,7 @@ namespace base
 				,std::vector<O>& os)
 		{
 			std::vector<discriminator> dans(sizel);
-			std::vector<O> oans(sizel);
+			std::vector<O> oans(sizel + 1);
 			node* n = begin;
 			for(int i = 0;i < sizel;i++)
 			{
@@ -277,6 +280,7 @@ namespace base
 				oans[i] = n->output;
 				n = n->next;
 			}
+			oans[sizel] = other;
 			ds = dans;
 			os = oans;
 		}
@@ -373,62 +377,56 @@ namespace base
 			std::vector<bool> wb(class_size(),false);
 			do
 			{
+				for(int i = 0;i < class_size();i++)
+				{
+					d[i] = discriminator(cases[0].size());
+					d[i].W(0) = 1;
+				}
 				do
 				{
-					do
+					
+					for(int i = 0;i < ref_case.size();i++)
 					{
-						for(int i = 0;i < ref_case.size();i++)
+						int c = ref_class[i];
+						if(!d[c].match(ref_case[i]))
 						{
-							int c = classes[i];
-							for(int j = 0;j < d[c].W_size();j++)
-								d[c].W(j) += rho * ref_case[i][j];
-						}
-						wb = std::vector<bool>(class_size(),false);
-						for(int i = 0;i < ref_case.size();i++)
-						{
-							int c = classes[i];
-							wb[c] = wb[c] || d[c].match(ref_case[i]);
+							for(int j = 0;j < ref_case[i].size();j++)
+								d[c].W(j) += rho*ref_case[i][j];
 						}
 					}
-					while(find_t(wb) == -1);
 
-					do
+					for(int i = 0;i < ref_case.size();i++)
 					{
-						for(int i = 0;i < ref_case.size();i++)
+						int c = ref_class[i];
+						for(int k = 0;k < class_size();k++)
 						{
-							int c = classes[i];
-							for(int k = 0;k < class_size();k++)
+							if(d[k].match(ref_case[i]) && c != k)
 							{
-								if(c != k && d[k].match(ref_case[i]))
-								{
-									for(int j = 0;j < d[c].W_size();j++)
-										d[k].W(j) -= rho * ref_case[i][j];
-								}
-							}
-						}
-						wb = std::vector<bool>(class_size(),false);
-						for(int i = 0;i < ref_case.size();i++)
-						{
-							int c = classes[i];
-							wb[c] = wb[c] || d[c].match(ref_case[i]);
-						}
-						if(find_t(wb) == -1)
-						{
-							break;
-						}
-						for(int i = 0;i < ref_case.size();i++)
-						{
-							for(int k = 0;k < class_size();k++)
-							{
-								int c = classes[i];
-								if(c != k)
-								{
-									wb[k] = wb[k] && !d[k].match(ref_case[i]);
-								}
+								for(int j = 0;j < ref_case[i].size();j++)
+									d[k].W(j) -= rho*ref_case[i][j];
 							}
 						}
 					}
-					while(find_t(wb) == -1);
+
+					wb = std::vector<bool>(class_size(),false);
+
+					for(int i = 0;i < ref_case.size();i++)
+					{
+						int c = ref_class[i];
+						wb[c] = wb[c] || d[c].match(ref_case[i]);
+					}
+
+					for(int i = 0;i < ref_case.size();i++)
+					{
+						int c = ref_class[i];
+						for(int j = 0;j < class_size();j++)
+						{
+							if(c != j)
+							{
+								wb[j] = wb[j] && !d[j].match(ref_case[i]);
+							}
+						}
+					}
 				}
 				while(find_t(wb) == -1);
 
@@ -438,19 +436,90 @@ namespace base
 				list.add_node(outputs[rindex],d[rindex]);
 				for(int i = 0;i < ref_case.size();i++)
 				{
-					if(d[rindex].match(ref_case[i]) && rindex == classes[i])
+					if(d[rindex].match(ref_case[i]) && rindex == ref_class[i])
 					{
 						outt.push_back(i);
 					}
 				}
-				progress(rindex,ref_case.size(),outt.size());
 				ref_case = outof(ref_case,outt);
 				ref_class = outof(ref_class,outt);
+				progress(rindex,ref_case.size(),cases.size());
 
 			}
 			while(ref_case.size() > 0);
 
 			return list;
+		}
+	
+	template<typename O>
+		d_list<O> d_creater<O>::optimisation(d_list<O> target,void(*progress)(long,int,int))
+		{
+			std::vector<discriminator> od;
+			std::vector<O> oo;
+			target.get_data(od,oo);
+			d_list<O> ans(oo[oo.size() - 1]);
+			oo.pop_back();
+
+			std::vector<std::vector<double> > ref_case = cases;
+			std::vector<unsigned long> ref_class = classes;
+			std::vector<std::vector<double> > buf_case;
+			std::vector<unsigned long> buf_class;
+			progress(0,ref_case.size(),cases.size());
+
+			{
+				progress(0,ref_case.size(),cases.size());
+				std::vector<int> outt;
+				for(int i = 0;i < ref_case.size();i++)
+				{
+					if(od[0].match(ref_case[i]))
+					{
+						outt.push_back(i);
+					}
+				}
+				buf_class = ref_class;
+				buf_case = ref_case;
+				ref_case = outof(ref_case,outt);
+				ref_class = outof(ref_class,outt);
+				ans.add_node(oo[0],od[0]);
+			}
+
+			int sc = 0;
+			for(int c = 1;c = od.size();c++)
+			{
+				progress(0,ref_case.size(),cases.size());
+				if(oo[c - 1] == oo[c])
+				{
+					bool erflg = true;
+					size_t bcs = buf_case.size();
+					size_t rcs = ref_case.size();
+					for(int i = 0;i < bcs;i++)
+					{
+						if(outputs[buf_class[i]] == oo[c])
+						{
+							bool eaflg = false;
+							for(int j = 0;j < rcs;j++)
+							{
+								if(buf_case[i] == ref_case[j])
+								{
+									eaflg = true;
+									break;
+								}
+							}
+							if(!eaflg)
+							{
+								erflg = erflg && od[c].match(buf_case[i]);
+							}
+						}
+					}
+					if(erflg)
+					{
+						ans.remove_end();
+					}
+				}
+				ans.add_node(oo[c],od[c]);
+
+			}
+			return ans;
 		}
 }
 
