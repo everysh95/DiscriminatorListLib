@@ -5,102 +5,129 @@ using System.Linq;
 namespace TPRS
 {
 
-	//識別共通木
+	//識別リスト
 	public class D_List<O>
 		where O :IEquatable<O>
 	{
+		public delegate void History(Discriminator d,int i,O output);
 		public D_List(O other)
 		{
 			this.other = other;
-			begin = null;
-			end = null;
-		}
-		public override string ToString()
-		{
-			string ans = "";
-			Node n = begin;
-			while(n != null)
-			{
-				if(n.next != null)
-					ans += n.output + "->" + n.next.output + "\n";
-				ans += "(" + n.d.W[0];
-				for(int i = 1;i < n.d.W.Length;i++)
-					ans += "," + n.d.W[i];
-				ans += ")\n";
-				n = n.next;
-			}
-			return ans;
+			d = new List<Discriminator>();
+			output = new List<O>();
 		}
 		public void AddNode(O output,Discriminator d)
 		{
-			Node n = new Node(output,d);
-			if(end != null)
-				end.next = n;
-			end = n;
-			if(begin == null)
-				begin = n;
+			this.d.Add(d);
+			this.output.Add(output);
+		}
+		public void GetData(ref List<Discriminator> ds,ref List<O> os)
+		{
+			ds = d;
+			os = output;
+			os.Add(other);
+		}
+		public ulong Size
+		{
+			get{return (ulong)d.Count;}
 		}
 		public void RemoveEnd()
 		{
-			Node n = begin;
-			if(n != null && n != end)
-			{
-				while(n.next != end)
-					n = n.next;
-				n.next = null;
-				end = n;
-			}
-		}
-		public void RemoveBegin()
-		{
-			if(begin != null)
-				begin = begin.next;
+			d.RemoveAt(d.Count - 1);
+			output.RemoveAt(output.Count - 1);
 		}
 		public O Run(double[] input)
 		{
-			Node n = begin;
+			int i = 0;
 			while(true)
 			{
-				if(n == null)
+				if(i >= d.Count)
 				{
 					return other;
 				}
-				else if(!n.d.Match(input))
+				else if(!d[i].Match(input))
 				{
-					n = n.next;
+					i++;
 				}
-				else if(n.d.Match(input))
+				else if(d[i].Match(input))
 				{
-					return n.output;
+					return output[i];
 				}
 			}
-		}
-		protected class Node
-		{
-			public Node()
-			{
-				next = null;
-				d = null;
-			}
-			public Node(O o,Discriminator d)
-			{
-				next = null;
-				this.d = d;
-				this.output = o;
-			}
-			public Node next;
-			public Discriminator d;
-			public O output;
 		}
 
-		protected Node begin;
-		protected Node end;
+		public void RunHistory(double[] input,History history)
+		{
+			int i = 0;
+			while(true)
+			{
+				if(i >= d.Count)
+				{
+					return;
+				}
+				else if(!d[i].Match(input))
+				{
+					history(d[i],i,output[i]);
+					i++;
+				}
+				else if(d[i].Match(input))
+				{
+					history(d[i],i,output[i]);
+					return;
+				}
+			}
+		}
+		public void RunHistory(double[] input,ref List<Discriminator> ow,ref List<O> oo)
+		{
+			int i = 0;
+			while(true)
+			{
+				if(i >= d.Count)
+				{
+					return;
+				}
+				else if(!d[i].Match(input))
+				{
+					ow.Add(d[i]);
+					oo.Add(output[i]);
+					i++;
+				}
+				else if(d[i].Match(input))
+				{
+					ow.Add(d[i]);
+					oo.Add(output[i]);
+					return;
+				}
+			}
+		}
+
+		public int RunCost(double[] input)
+		{
+			int i = 0;
+			while(true)
+			{
+				if(i >= d.Count)
+				{
+					return -1;
+				}
+				else if(!d[i].Match(input))
+				{
+					i++;
+				}
+				else if(d[i].Match(input))
+				{
+					return i;
+				}
+			}
+		}
+		protected List<Discriminator> d;
+		protected List<O> output;
 		protected O other;
 	}
 
 	//識別器
 	public class Discriminator
-		:CR_Tree.CRT_IO< double[] >,IEquatable<Discriminator>
+		:IEquatable<Discriminator>
 	{
 		public Discriminator(){}
 		public Discriminator(double[] w)

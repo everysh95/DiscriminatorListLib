@@ -58,7 +58,7 @@ int main(int argc,char** argv)
 	}
 	fclose(fp);
 
-	cout << "case size:" << dc.case_size() << endl;
+	cout << "Case Size:" << dc.case_size() << endl;
 	cout << endl;
 	d_list<int> dl;
 	dl = dc.study(2,rho,[](long ri,int i,int s){
